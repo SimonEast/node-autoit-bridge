@@ -66,7 +66,6 @@ That's it! 🎉
 - **Synchronous execution** — calls block the Node.js event loop while AutoIt runs (typically ~0.1 seconds)
 - **4-second timeout** — each call times out after 4 seconds to prevent hanging
 - **No COM interaction** — this bridge uses process execution, not COM objects
-- **Not yet tested with arrays, maps & objects** (coming soon!) — while the bridge supports passing arrays and objects, this hasn't been fully tested yet. Use with caution.
 
 Async execution and configurable timeouts are planned for coming release.
 

@@ -26,16 +26,7 @@ import { join } from 'path';
  * 3. Captures full output, separating the console output from the function output
  * 
  * TODO:
- *   - String params need AutoIt escaping, not JSON escaping. Maybe use _JSON_Parse. Test with quotes, line returns and other special chars used in 8XP.
- *   - Support for passing arrays and objects (maps) as parameters
- *     (wrap them in _JSON_Parse)
- *   - Vitest
- *   - Maybe allow multiple function calls? To avoid needing to run the executable multiple times.
- *   - What command puts errors out into console rather than a MsgBox?
  *   - Include a copy of autoit.exe? And option to configure path
- *   - README, license, repo, publish
- *   - Support for no function call, include only (= no return value)
- *   - Support for executing custom Au3 code, not just a function call (still wraps it in a function to allow a return statement)
  *   - Also return @error value
  * 
  * @param {string} file - The path to the .au3 file containing the function to call, relative to the current working directory
@@ -87,18 +78,37 @@ export function runAutoItCode(au3Code) {
 }
 
 /**
- * Shortcut method to run an AutoIt function and return only the result
+ * Run an AutoIt function and return the result of the function call.
  * 
- * @param {*} file - The path to the .au3 file containing the function to call, relative to the current working directory
- * @param {*} functionName - The name of the function to call within the .au3 file
+ * If you need the full console output or execution time, use 
+ * runAutoItFunctionDetailed() instead.
+ * 
+ * @param {string} file - The path to the .au3 file containing the function to call, relative to the current working directory
+ * @param {string} functionName - The name of the function to call within the .au3 file
  * @param  {...any} params - Optional parameters to pass to the AutoIt function
  * @returns The result of the AutoIt function, which could be a string, number, array, or object, depending on what the function returns. If the function does not return anything, this will be undefined.
 */
 export function runAutoItFunction(file, functionName, ...params) {
-   const result = runAutoItFunctionDetailed(file, functionName, ...params);
-   return result.result;
+   return runAutoItFunctionDetailed(file, functionName, ...params).result;
 }
 
+/**
+ * Run an AutoIt function and return detailed information about the execution,
+ * including the result of the function call, the full console output, and the 
+ * time taken to execute.
+ * 
+ * TODO:
+ *   - Maybe allow multiple function calls? To avoid needing to run the executable multiple times.
+ *   - Also return @error value
+ * 
+ * @param {string} file - The path to the .au3 file containing the function to call, relative to the current working directory
+ * @param {string} functionName - The name of the function to call within the .au3 file
+ * @param {...any} params - Optional parameters to pass to the AutoIt function
+ * @returns {object} An object containing:
+ *   - result: The parsed result of the function call (if any)
+ *   - output: Any other console output from the AutoIt script execution
+ *   - time: The time taken to execute the function, in seconds
+ */
 export function runAutoItFunctionDetailed(file, functionName, ...params) {
    
    // Create the content of the temporary .au3 file
