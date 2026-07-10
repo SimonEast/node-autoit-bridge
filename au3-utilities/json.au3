@@ -567,11 +567,11 @@ EndFunc   ;==>__JSON_ParseString
 Func __JSON_FormatString($sString)
     ; Quick check if any characters need escaping
     If Not StringRegExp($sString, '[\n\r\t"\\\b\f]') Then Return $sString
-    
+
     ; Special chars found - choose replacement method by string length:
     ; for small strings direct RegExpReplace-method is faster; for long strings the manual method is better
 	Return StringLen($sString) < 50 _
-	? StringTrimRight(StringRegExpReplace($sString & '\\\b\f\n\r\t\"', '(?s)(?|\\(?=.*(\\\\))|[\b](?=.*(\\b))|\f(?=.*(\\f))|\r\n(?=.*(\\n))|\n(?=.*(\\n))|\r(?=.*(\\r))|\t(?=.*(\\t))|"(?=.*(\\")))', '\1'), 15) _
+	? StringTrimRight(StringRegExpReplace($sString & '\\\b\f\n\r\t\"', '(?s)(?|\\(?=.*(\\\\))|[\b](?=.*(\\b))|\f(?=.*(\\f))|\r\n(?=.*(\\r\\n))|\n(?=.*(\\n))|\r(?=.*(\\r))|\t(?=.*(\\t))|"(?=.*(\\")))', '\1'), 15) _
 	: StringReplace( _
 		StringReplace( _
 			StringReplace( _
@@ -582,7 +582,7 @@ Func __JSON_FormatString($sString)
 								StringReplace($sString, '\', '\\', 0, 1) _
 							, Chr(8), "\b", 0, 1) _
 						, Chr(12), "\f", 0, 1) _
-					, @CRLF, "\n", 0, 1) _
+					, @CRLF, "\r\n", 0, 1) _      ; mod to original code
 				, @LF, "\n", 0, 1) _
 			, @CR, "\r", 0, 1) _
 		, @TAB, "\t", 0, 1) _
