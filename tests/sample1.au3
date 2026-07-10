@@ -1,8 +1,8 @@
 #include "../au3-utilities/json.au3"
 
-ConsoleWrite(_JSON_Parse("3") & @CRLF)
-ConsoleWrite(_JSON_Parse('"A"') & @CRLF)
-ConsoleWrite(_JSON_Generate('A' & @CRLF & 'B') & @CRLF)
+;~ ConsoleWrite(_JSON_Parse("3") & @CRLF)
+;~ ConsoleWrite(_JSON_Parse('"A"') & @CRLF)
+;~ ConsoleWrite(_JSON_Generate('A' & @CRLF & 'B') & @CRLF)
 
 Func Sample($string, $num1, $num2)
 	ConsoleWrite("This is a console message from AutoIt!" & @CRLF)

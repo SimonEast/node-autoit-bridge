@@ -43,13 +43,58 @@ import { join } from 'path';
  * @param {...any} params - The parameters to pass to the function, which will be JSON-stringified if they are objects or arrays
  * @returns {object} An object containing the full console output and the parsed result of the function call
 */
-export function runAutoItFunctionCaptureOutput(file, functionName, ...params) {
+export function runAutoItCode(au3Code) {
 
    // Create a temporary .au3 file to execute the function call
    // Use a timestamp to ensure unique file names and avoid collisions
    // (milliseconds are included to reduce the chance of collisions)
    const tempFilePath = join(tmpdir(), `tempScript_${Date.now()}.au3`);
 
+   const tempFileContent = `
+      Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
+      ${au3Code}
+   `;
+
+   // Write the temporary .au3 file
+   writeFileSync(tempFilePath, tempFileContent);
+
+   let result = { output: '' };
+   let startTime = performance.now();
+
+   try {
+      // Execute the temporary .au3 file and capture the output
+      result.output = execSync(`"c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe" "${tempFilePath}"`, { 
+            encoding: 'utf-8',
+            timeout: 4000 // 4 seconds timeout to prevent hanging
+      });
+
+   } catch (error) {
+      console.error('Error executing AutoIt script:', error);
+   } finally {
+      // Clean up the temporary file, regardless of whether the execution was successful or not
+      unlinkSync(tempFilePath);
+   }
+
+   result.time = Math.round(performance.now() - startTime) / 1000; // Time in seconds
+
+   return result;
+}
+
+/**
+ * Shortcut method to run an AutoIt function and return only the result
+ * 
+ * @param {*} file - The path to the .au3 file containing the function to call, relative to the current working directory
+ * @param {*} functionName - The name of the function to call within the .au3 file
+ * @param  {...any} params - Optional parameters to pass to the AutoIt function
+ * @returns The result of the AutoIt function, which could be a string, number, array, or object, depending on what the function returns. If the function does not return anything, this will be undefined.
+*/
+export function runAutoItFunction(file, functionName, ...params) {
+   const result = runAutoItFunctionDetailed(file, functionName, ...params);
+   return result.result;
+}
+
+export function runAutoItFunctionDetailed(file, functionName, ...params) {
+   
    // Create the content of the temporary .au3 file
    // Always relative to this bridge.js file, not the target .au3 file
    const pathToJsonLib = join(import.meta.dirname, 'au3-utilities/json.au3');  
@@ -66,8 +111,8 @@ export function runAutoItFunctionCaptureOutput(file, functionName, ...params) {
    // Full function call string, e.g. MyFunction(_JSON_Parse("param1"), _JSON_Parse("param2"))
    const functionCall = `${functionName}(${functionParams})`;
 
-   const tempFileContent = `
-      Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
+   // Generate the AutoIt code to be executed
+   let au3Code = `
       #include "${pathToJsonLib}"
       #include "${pathToTargetFile}"
       Local $result = ${functionCall}
@@ -75,56 +120,21 @@ export function runAutoItFunctionCaptureOutput(file, functionName, ...params) {
    `;
 
    // For debugging, you can log the temp file content
-   console.log('Generated AutoIt script content:\n', tempFileContent);
+   console.log('Generated AutoIt script content:\n', au3Code);
 
-   // Write the temporary .au3 file
-   writeFileSync(tempFilePath, tempFileContent);
+   let result = runAutoItCode(au3Code);
 
-   let result;
-   let startTime = performance.now();
+   // Extract the function output from the rest of the console output
+   const match = result.output.match(/FUNCTION_OUTPUT_START(.*?)FUNCTION_OUTPUT_END/s);
 
-   try {
-      // Execute the temporary .au3 file and capture the output
-      const output = execSync(`"c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe" "${tempFilePath}"`, { 
-         encoding: 'utf-8',
-         timeout: 4000 // 4 seconds timeout to prevent hanging
-      });
-      // Extract the function output from the console output
-      const match = output.match(/FUNCTION_OUTPUT_START(.*?)FUNCTION_OUTPUT_END/s);
-      if (match) {
-         const functionOutput = JSON.parse(match[1]);
-         result = { 
-            output: output.split('FUNCTION_OUTPUT_START')[0],   // everything up until the function output
-            result: functionOutput 
-         };
-      } else {
-         throw new Error('Function output not found in console output');
-      }
-   } catch (error) {
-      console.error('Error executing AutoIt script:', error);
-      result = { output: '', result: null };
-   } finally {
-      // Clean up the temporary file
-      unlinkSync(tempFilePath);
-   }
+   if (!match)
+      throw new Error('Function output not found in console output');
 
-   result.time = Math.round(performance.now() - startTime) / 1000; // Time in seconds
-
+   const functionOutput = JSON.parse(match[1]);
+   result.output = result.output.split('FUNCTION_OUTPUT_START')[0];   // everything up until the function output
+   result.result = functionOutput;
    return result;
 }
-
-/**
- * Shortcut method to run an AutoIt function and return only the result, without the full console output or execution time.
- * 
- * @param {*} file - The path to the .au3 file containing the function to call, relative to the current working directory
- * @param {*} functionName - The name of the function to call within the .au3 file
- * @param  {...any} params - Optional parameters to pass to the AutoIt function
- * @returns The result of the AutoIt function, which could be a string, number, array, or object, depending on what the function returns. If the function does not return anything, this will be undefined.
- */
-export function runAutoItFunction(file, functionName, ...params) {
-   return runAutoItFunctionCaptureOutput(...arguments).result;
-}
-
 
 // Perform a test run
 // console.log(import.meta.resolve('./au3/json.au3'));
