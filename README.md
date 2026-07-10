@@ -170,8 +170,6 @@ console.log('Result was:', result);
 
 ### Error handling
 
-⚠️ Exceptions not yet thrown for AutoIt errors. Instead, check the `output` for error messages. Future versions will throw exceptions for failed calls, like this:
-
 ```js
 try {
     const result = runAutoItFunction('scripts.au3', 'RiskyOperation');

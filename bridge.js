@@ -51,6 +51,7 @@ export function runAutoItCode(au3Code) {
    const tempFilePath = join(tmpdir(), `tempScript_${Date.now()}.au3`);
 
    const tempFileContent = `
+      #NoTrayIcon
       Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
       ${au3Code}
    `;
@@ -63,13 +64,18 @@ export function runAutoItCode(au3Code) {
 
    try {
       // Execute the temporary .au3 file and capture the output
-      result.output = execSync(`"c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe" "${tempFilePath}"`, { 
+      result.output = execSync(`"c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe" /ErrorStdOut "${tempFilePath}"`, { 
             encoding: 'utf-8',
             timeout: 4000 // 4 seconds timeout to prevent hanging
       });
 
    } catch (error) {
-      console.error('Error executing AutoIt script:', error);
+      // We could reach here under two scenarios:
+      // 1. The AutoIt script executed but returned a non-zero exit code (e.g., due to an error in the script)
+      // 2. The AutoIt script did not execute at all (e.g., AutoIt not found, script file not found, permission issues)
+      // In both cases, we want to throw an error that contains the details.
+      throw new Error(`Error executing AutoIt script: ${error.message}. Output: \n${error.stdout || error.stderr}`, {cause: error});
+
    } finally {
       // Clean up the temporary file, regardless of whether the execution was successful or not
       unlinkSync(tempFilePath);
@@ -120,7 +126,7 @@ export function runAutoItFunctionDetailed(file, functionName, ...params) {
    `;
 
    // For debugging, you can log the temp file content
-   console.log('Generated AutoIt script content:\n', au3Code);
+   // console.log('Generated AutoIt script content:\n', au3Code);
 
    let result = runAutoItCode(au3Code);
 

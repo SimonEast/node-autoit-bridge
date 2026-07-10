@@ -19,6 +19,11 @@ describe('runAutoItCode()', () => {
 		expect(runAutoItCode(au3Code)).toMatchObject({ output: expected });
 	});
 
+	test('errors should throw an exception', () => {
+		const au3Code = `NonExistentFunction()`;
+		expect(() => runAutoItCode(au3Code)).toThrow();
+	});
+
 });
 
 describe('runAutoItFunction()', () => {
@@ -31,8 +36,14 @@ describe('runAutoItFunction()', () => {
 		['tests/sample1.au3', 'AddNumbers', [1.1, 2.2], 3.3],
 	])('runAutoItFunction(%j, %j, %j) == %j', (file, func, params, expected) => {
 		const result = runAutoItFunction(file, func, ...params);
-		console.log(result);
+		// console.log(result);
 		
 		expect(result).toEqual(expected);
+	});
+
+	test('errors should throw an exception', () => {
+		const au3Code = `NonExistentFunction()`;
+		expect(() => runAutoItFunction('NonExistentFile.au3', 'NonExistentFunction')).toThrow();
+		expect(() => runAutoItFunction('tests/sample1.au3', 'NonExistentFunction')).toThrow();
 	});
 });
