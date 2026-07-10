@@ -4,24 +4,39 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 /**
- * The main function in this file does these things:
+ * Runs an AutoIt function from a specified .au3 file, passing in parameters and capturing the output. Returns an object containing:
+ *   - result: The parsed result of the function call (if any)
+ *   - output: The full console output from the AutoIt script execution
+ *   - time: The time taken to execute the function, in seconds
  * 
- * 1. Creates a temporary .au3 file based on current timestamp that
- *    - Imports the specified file (should it support multiple? maybe not needed)
- *    - Calls the provided function, if given
- *    - Includes the given parameters
+ * Use runAutoItFunction() if you only want the result of the function call.
+ * 
+ * How this function works:
+ * 
+ * 1. Creates a temporary .au3 file based on current timestamp that:
+ *    - Includes the specified file (should it support multiple? maybe not needed)
+ *    - Calls the specified function, if given, with any given parameters
  *    - If passing arrays or maps as parameters, these will need a conversion function. 
  *      Perhaps as JSON? Could be included in temp script too.
  *    - Converts the result of the function to JSON
  *    - Outputs the JSON after a special flag
  * 
- * 2. Executes autoit3 tempScript.au3
+ * 2. Executes `autoit3 tempScript.au3`
  * 
  * 3. Captures full output, separating the console output from the function output
  * 
  * TODO:
+ *   - String params need AutoIt escaping, not JSON escaping. Maybe use _JSON_Parse. Test with quotes, line returns and other special chars used in 8XP.
  *   - Support for passing arrays and objects (maps) as parameters
  *     (wrap them in _JSON_Parse)
+ *   - Vitest
+ *   - Maybe allow multiple function calls? To avoid needing to run the executable multiple times.
+ *   - What command puts errors out into console rather than a MsgBox?
+ *   - Include a copy of autoit.exe? And option to configure path
+ *   - README, license, repo, publish
+ *   - Support for no function call, include only (= no return value)
+ *   - Support for executing custom Au3 code, not just a function call (still wraps it in a function to allow a return statement)
+ *   - Also return @error value
  * 
  * @param {string} file - The path to the .au3 file containing the function to call, relative to the current working directory
  * @param {string} functionName - The name of the function to call within the .au3 file
@@ -30,22 +45,37 @@ import { join } from 'path';
 */
 export function runAutoItFunctionCaptureOutput(file, functionName, ...params) {
 
+   // Create a temporary .au3 file to execute the function call
+   // Use a timestamp to ensure unique file names and avoid collisions
+   // (milliseconds are included to reduce the chance of collisions)
    const tempFilePath = join(tmpdir(), `tempScript_${Date.now()}.au3`);
 
    // Create the content of the temporary .au3 file
-   const pathToJsonLib = join(import.meta.dirname, 'au3/json.au3');  // Always relative to this bridge.js file, not the target .au3 file
-   const pathToTargetFile = join(process.cwd(), file);  // Relative to the current working directory
-   const functionCall = `${functionName}(${params.map(p => JSON.stringify(p)).join(', ')})`;
+   // Always relative to this bridge.js file, not the target .au3 file
+   const pathToJsonLib = join(import.meta.dirname, 'au3-utilities/json.au3');  
+
+   // Relative to the current working directory
+   const pathToTargetFile = join(process.cwd(), file);  
+
+   // Generate the list of parameters for the function call, wrapping them in 
+   // _JSON_Parse to support arrays, objects, line returns, and special characters
+   const functionParams = params.map(p => 
+      '_JSON_Parse("' + JSON.stringify(p).replaceAll('"', '""') + '")'
+   ).join(', ');
+
+   // Full function call string, e.g. MyFunction(_JSON_Parse("param1"), _JSON_Parse("param2"))
+   const functionCall = `${functionName}(${functionParams})`;
+
    const tempFileContent = `
-Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
-#include "${pathToJsonLib}"
-#include "${pathToTargetFile}"
-Local $result = ${functionCall}
-ConsoleWrite("FUNCTION_OUTPUT_START" & _JSON_Generate($result) & "FUNCTION_OUTPUT_END")
-`;
+      Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
+      #include "${pathToJsonLib}"
+      #include "${pathToTargetFile}"
+      Local $result = ${functionCall}
+      ConsoleWrite("FUNCTION_OUTPUT_START" & _JSON_Generate($result) & "FUNCTION_OUTPUT_END")
+   `;
 
    // For debugging, you can log the temp file content
-   // console.log('Generated AutoIt script content:\n', tempFileContent);
+   console.log('Generated AutoIt script content:\n', tempFileContent);
 
    // Write the temporary .au3 file
    writeFileSync(tempFilePath, tempFileContent);
@@ -83,6 +113,14 @@ ConsoleWrite("FUNCTION_OUTPUT_START" & _JSON_Generate($result) & "FUNCTION_OUTPU
    return result;
 }
 
+/**
+ * Shortcut method to run an AutoIt function and return only the result, without the full console output or execution time.
+ * 
+ * @param {*} file - The path to the .au3 file containing the function to call, relative to the current working directory
+ * @param {*} functionName - The name of the function to call within the .au3 file
+ * @param  {...any} params - Optional parameters to pass to the AutoIt function
+ * @returns The result of the AutoIt function, which could be a string, number, array, or object, depending on what the function returns. If the function does not return anything, this will be undefined.
+ */
 export function runAutoItFunction(file, functionName, ...params) {
    return runAutoItFunctionCaptureOutput(...arguments).result;
 }
@@ -92,6 +130,6 @@ export function runAutoItFunction(file, functionName, ...params) {
 // console.log(import.meta.resolve('./au3/json.au3'));
 // console.log(__dirname);
 
-const result = runAutoItFunctionCaptureOutput('./tests/sample1.au3', 'Sample', 'Hello, World!', 42, 3.14);
-console.log('Function result:', result);
-console.log('Function result:', result.result);
+// const result = runAutoItFunctionCaptureOutput('./tests/sample1.au3', 'Sample', 'Hello, World!', 42, 3.14);
+// console.log('Function result:', result);
+// console.log('Function result:', result.result);

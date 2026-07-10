@@ -1,0 +1,19 @@
+{
+  "name": "node-autoit-bridge",
+  "version": "1.0.0",
+  "description": "Call AutoIt3 scripts and functions from within Node.js scripts.",
+  "license": "MIT",
+  "author": "Simon East",
+  "type": "module",
+  "main": "bridge.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest --ui"
+  },
+  "dependencies": {
+    "@vitest/ui": "^4.1.10",
+    "vitest": "^4.1.10"
+  }
+}
