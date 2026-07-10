@@ -1,155 +1,154 @@
-import { execSync } from 'child_process';
-import { writeFileSync, unlinkSync } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { writeFile, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+const execAsync = promisify(exec);
+
 /**
- * Runs an AutoIt function from a specified .au3 file, passing in parameters and capturing the output. Returns an object containing:
- *   - result: The parsed result of the function call (if any)
+ * Runs raw AutoIt3 code by writing it to a temporary .au3 file and executing it.
+ * Returns a Promise that resolves to an object containing:
  *   - output: The full console output from the AutoIt script execution
  *   - time: The time taken to execute the function, in seconds
- * 
- * Use runAutoItFunction() if you only want the result of the function call.
- * 
+ *
+ * Use runAutoItFunction() if you only want the result of a function call.
+ *
  * How this function works:
- * 
- * 1. Creates a temporary .au3 file based on current timestamp that:
- *    - Includes the specified file (should it support multiple? maybe not needed)
- *    - Calls the specified function, if given, with any given parameters
- *    - If passing arrays or maps as parameters, these will need a conversion function. 
- *      Perhaps as JSON? Could be included in temp script too.
- *    - Converts the result of the function to JSON
- *    - Outputs the JSON after a special flag
- * 
- * 2. Executes `autoit3 tempScript.au3`
- * 
- * 3. Captures full output, separating the console output from the function output
- * 
+ *
+ * 1. Creates a temporary .au3 file based on current timestamp that contains the
+ *    provided AutoIt code.
+ * 2. Executes `AutoIt3.exe tempScript.au3` asynchronously
+ * 3. Captures full console output
+ *
  * TODO:
- *   - Include a copy of autoit.exe? And option to configure path
+ *   - Include a copy of AutoIt.exe? And option to configure path
  *   - Also return @error value
- * 
- * @param {string} file - The path to the .au3 file containing the function to call, relative to the current working directory
- * @param {string} functionName - The name of the function to call within the .au3 file
- * @param {...any} params - The parameters to pass to the function, which will be JSON-stringified if they are objects or arrays
- * @returns {object} An object containing the full console output and the parsed result of the function call
-*/
-export function runAutoItCode(au3Code) {
+ *
+ * @param {string} au3Code - Raw AutoIt3 code to execute
+ * @returns {Promise<{output: string, time: number}>} An object containing the
+ *   full console output and execution time in seconds.
+ */
+export async function runAutoItCode(au3Code) {
 
-   // Create a temporary .au3 file to execute the function call
-   // Use a timestamp to ensure unique file names and avoid collisions
-   // (milliseconds are included to reduce the chance of collisions)
-   const tempFilePath = join(tmpdir(), `tempScript_${Date.now()}.au3`);
+    // Create a temporary .au3 file to execute the function call
+    // Use a timestamp to ensure unique file names and avoid collisions
+    // (milliseconds are included to reduce the chance of collisions)
+    const tempFilePath = join(tmpdir(), `tempScript_${Date.now()}.au3`);
 
-   const tempFileContent = `
+    const tempFileContent = `
       #NoTrayIcon
       Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
       ${au3Code}
    `;
 
-   // Write the temporary .au3 file
-   writeFileSync(tempFilePath, tempFileContent);
+    // Write the temporary .au3 file
+    await writeFile(tempFilePath, tempFileContent);
 
-   let result = { output: '' };
-   let startTime = performance.now();
+    const startTime = performance.now();
 
-   try {
-      // Execute the temporary .au3 file and capture the output
-      result.output = execSync(`"c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe" /ErrorStdOut "${tempFilePath}"`, { 
-            encoding: 'utf-8',
-            timeout: 4000 // 4 seconds timeout to prevent hanging
-      });
+    try {
+        const { stdout } = await execAsync(
+            `"c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe" /ErrorStdOut "${tempFilePath}"`,
+            { encoding: 'utf-8', timeout: 4000 }
+        );
+        const time = Math.round(performance.now() - startTime) / 1000;
+        return { output: stdout, time };
 
-   } catch (error) {
-      // We could reach here under two scenarios:
-      // 1. The AutoIt script executed but returned a non-zero exit code (e.g., due to an error in the script)
-      // 2. The AutoIt script did not execute at all (e.g., AutoIt not found, script file not found, permission issues)
-      // In both cases, we want to throw an error that contains the details.
-      throw new Error(`Error executing AutoIt script: ${error.message}. Output: \n${error.stdout || error.stderr}`, {cause: error});
+    } catch (error) {
+        // We could reach here under two scenarios:
+        // 1. The AutoIt script executed but returned a non-zero exit code
+        // 2. The AutoIt script did not execute at all (AutoIt not found, etc.)
+        throw new Error(
+            `Error executing AutoIt script: ${error.message}. Output: \n${error.stdout || error.stderr}`,
+            { cause: error }
+        );
 
-   } finally {
-      // Clean up the temporary file, regardless of whether the execution was successful or not
-      unlinkSync(tempFilePath);
-   }
-
-   result.time = Math.round(performance.now() - startTime) / 1000; // Time in seconds
-
-   return result;
+    } finally {
+        // Clean up the temporary file regardless of outcome
+        await unlink(tempFilePath).catch(() => {});
+    }
 }
 
 /**
  * Run an AutoIt function and return the result of the function call.
- * 
- * If you need the full console output or execution time, use 
+ *
+ * If you need the full console output or execution time, use
  * runAutoItFunctionDetailed() instead.
- * 
+ *
  * @param {string} file - The path to the .au3 file containing the function to call, relative to the current working directory
  * @param {string} functionName - The name of the function to call within the .au3 file
  * @param  {...any} params - Optional parameters to pass to the AutoIt function
- * @returns The result of the AutoIt function, which could be a string, number, array, or object, depending on what the function returns. If the function does not return anything, this will be undefined.
-*/
-export function runAutoItFunction(file, functionName, ...params) {
-   return runAutoItFunctionDetailed(file, functionName, ...params).result;
+ * @returns {Promise<any>} The result of the AutoIt function, which could be a
+ *   string, number, array, or object, depending on what the function returns.
+ *   If the function does not return anything, this will be undefined.
+ */
+export async function runAutoItFunction(file, functionName, ...params) {
+    const { result } = await runAutoItFunctionDetailed(file, functionName, ...params);
+    return result;
 }
 
 /**
  * Run an AutoIt function and return detailed information about the execution,
- * including the result of the function call, the full console output, and the 
+ * including the result of the function call, the full console output, and the
  * time taken to execute.
- * 
+ *
  * TODO:
- *   - Maybe allow multiple function calls? To avoid needing to run the executable multiple times.
+ *   - Maybe allow multiple function calls to avoid running the exe multiple times
  *   - Also return @error value
- * 
- * @param {string} file - The path to the .au3 file containing the function to call, relative to the current working directory
- * @param {string} functionName - The name of the function to call within the .au3 file
+ *
+ * @param {string} file - The path to the .au3 file containing the function,
+ *   relative to the current working directory
+ * @param {string} functionName - The name of the function to call
  * @param {...any} params - Optional parameters to pass to the AutoIt function
- * @returns {object} An object containing:
+ * @returns {Promise<{result: any, output: string, time: number}>} An object containing:
  *   - result: The parsed result of the function call (if any)
  *   - output: Any other console output from the AutoIt script execution
  *   - time: The time taken to execute the function, in seconds
  */
-export function runAutoItFunctionDetailed(file, functionName, ...params) {
-   
-   // Create the content of the temporary .au3 file
-   // Always relative to this bridge.js file, not the target .au3 file
-   const pathToJsonLib = join(import.meta.dirname, 'au3-utilities/json.au3');  
+export async function runAutoItFunctionDetailed(file, functionName, ...params) {
 
-   // Relative to the current working directory
-   const pathToTargetFile = join(process.cwd(), file);  
+    // Create the content of the temporary .au3 file
+    // Always relative to this bridge.js file, not the target .au3 file
+    const pathToJsonLib = join(import.meta.dirname, 'au3-utilities', 'json.au3');
 
-   // Generate the list of parameters for the function call, wrapping them in 
-   // _JSON_Parse to support arrays, objects, line returns, and special characters
-   const functionParams = params.map(p => 
-      '_JSON_Parse("' + JSON.stringify(p).replaceAll('"', '""') + '")'
-   ).join(', ');
+    // Relative to the current working directory
+    const pathToTargetFile = join(process.cwd(), file);
 
-   // Full function call string, e.g. MyFunction(_JSON_Parse("param1"), _JSON_Parse("param2"))
-   const functionCall = `${functionName}(${functionParams})`;
+    // Generate the list of parameters for the function call, wrapping them in
+    // _JSON_Parse to support arrays, objects, line returns, and special characters
+    const functionParams = params.map(p =>
+        '_JSON_Parse("' + JSON.stringify(p).replaceAll('"', '""') + '")'
+    ).join(', ');
 
-   // Generate the AutoIt code to be executed
-   let au3Code = `
+    // Full function call string, e.g. MyFunction(_JSON_Parse("param1"), _JSON_Parse("param2"))
+    const functionCall = `${functionName}(${functionParams})`;
+
+    // Generate the AutoIt code to be executed
+    const au3Code = `
       #include "${pathToJsonLib}"
       #include "${pathToTargetFile}"
       Local $result = ${functionCall}
       ConsoleWrite("FUNCTION_OUTPUT_START" & _JSON_Generate($result) & "FUNCTION_OUTPUT_END")
    `;
 
-   // For debugging, you can log the temp file content
-   // console.log('Generated AutoIt script content:\n', au3Code);
+    // For debugging, you can log the temp file content
+    // console.log('Generated AutoIt script content:\n', au3Code);
 
-   let result = runAutoItCode(au3Code);
+    const { output, time } = await runAutoItCode(au3Code);
 
-   // Extract the function output from the rest of the console output
-   const match = result.output.match(/FUNCTION_OUTPUT_START(.*?)FUNCTION_OUTPUT_END/s);
+    // Extract the function output from the rest of the console output
+    const match = output.match(/FUNCTION_OUTPUT_START(.*?)FUNCTION_OUTPUT_END/s);
 
-   if (!match)
-      throw new Error('Function output not found in console output');
+    if (!match)
+        throw new Error('Function output not found in console output');
 
-   const functionOutput = JSON.parse(match[1]);
-   result.output = result.output.split('FUNCTION_OUTPUT_START')[0];   // everything up until the function output
-   result.result = functionOutput;
-   return result;
+    const functionOutput = JSON.parse(match[1]);
+    return {
+        output: output.split('FUNCTION_OUTPUT_START')[0], // everything before the function output
+        result: functionOutput,
+        time
+    };
 }
 
 // Perform a test run

@@ -2,8 +2,6 @@
 
 Call AutoIt3 scripts and functions directly from your Node.js application. Pass parameters, get return values — all without leaving JavaScript.
 
-> 🚧 **This package is not yet published on npm.** Install it directly from GitHub (see [Installation](#installation) below).
-
 ## What is this?
 
 AutoIt3 is a powerful Windows automation language. This bridge lets you write your automation logic in `.au3` files and call it from Node.js as easily as any other function.
@@ -11,13 +9,13 @@ AutoIt3 is a powerful Windows automation language. This bridge lets you write yo
 ```js
 import { runAutoItFunction } from 'node-autoit-bridge';
 
-const result = runAutoItFunction('my-scripts/window.au3', 'GetWindowTitle');
+const result = await runAutoItFunction('my-scripts/window.au3', 'GetWindowTitle');
 console.log(result); // "Untitled - Notepad"
 ```
 
 ## Prerequisites
 
-- **Windows only** — AutoIt3 is Windows-native
+- **Windows only** — AutoIt3 is Windows-native (although it can be run in Wine on Mac/Linux in some cases)
 - **AutoIt3** installed at `C:\Program Files (x86)\AutoIt3\AutoIt3.exe` (the default location)
 - **Node.js** 20.11+ (uses `import.meta.dirname`, added in Node 20.11 / 21.2)
 
@@ -54,7 +52,7 @@ EndFunc
 ```js
 import { runAutoItFunction } from 'node-autoit-bridge';
 
-const greeting = runAutoItFunction('greet.au3', 'Greet', 'World');
+const greeting = await runAutoItFunction('greet.au3', 'Greet', 'World');
 console.log(greeting); // "Hello, World!"
 ```
 
@@ -62,28 +60,25 @@ That's it! 🎉
 
 ## Limitations
 
-- **Windows only** — AutoIt3 doesn't run on macOS or Linux
-- **Synchronous execution** — calls block the Node.js event loop while AutoIt runs (typically ~0.1 seconds)
-- **4-second timeout** — each call times out after 4 seconds to prevent hanging
+- **Windows only** — although AutoIt3 can be run in Wine on Mac/Linux in some cases, it is not officially supported
+- **4-second timeout** — each call times out after 4 seconds to prevent hanging. A configurable timeout is planned for a coming release.
 - **No COM interaction** — this bridge uses process execution, not COM objects
-
-Async execution and configurable timeouts are planned for coming release.
 
 ## API
 
 ### `runAutoItFunction(file, functionName, ...params)`
 
-The simplest way to call an AutoIt function. Returns just the result.
+The simplest way to call an AutoIt function. Returns a Promise that resolves to the result.
 
 ```js
 import { runAutoItFunction } from 'node-autoit-bridge';
 
 // Call AddNumbers(5, 10) in math.au3
-const sum = runAutoItFunction('math.au3', 'AddNumbers', 5, 10);
+const sum = await runAutoItFunction('math.au3', 'AddNumbers', 5, 10);
 console.log(sum); // 15
 
 // Strings work too
-const title = runAutoItFunction('window.au3', 'GetWindowTitle');
+const title = await runAutoItFunction('window.au3', 'GetWindowTitle');
 console.log(title); // "My Application"
 ```
 
@@ -93,7 +88,7 @@ console.log(title); // "My Application"
 | `functionName` | `string` | Name of the AutoIt function to call |
 | `...params` | `any` | Arguments to pass to the function (strings, numbers, booleans, arrays, objects) |
 
-**Returns:** The value returned by your AutoIt function (string, number, array, or object).
+**Returns:** `Promise<any>` — Resolves to the value returned by your AutoIt function (string, number, array, or object).
 
 ---
 
@@ -104,7 +99,7 @@ Same as above, but returns extra details about the execution:
 ```js
 import { runAutoItFunctionDetailed } from 'node-autoit-bridge';
 
-const details = runAutoItFunctionDetailed('math.au3', 'AddNumbers', 5, 10);
+const details = await runAutoItFunctionDetailed('math.au3', 'AddNumbers', 5, 10);
 // {
 //   result: 15,               ← The function's return value
 //   output: "...",            ← Any ConsoleWrite output from the script
@@ -116,12 +111,12 @@ const details = runAutoItFunctionDetailed('math.au3', 'AddNumbers', 5, 10);
 
 ### `runAutoItCode(au3Code)`
 
-Run raw AutoIt code as a string. Useful for one-off scripts or when you don't need a separate `.au3` file.
+Run raw AutoIt code as a string. Returns a Promise. Useful for one-off scripts or when you don't need a separate `.au3` file.
 
 ```js
 import { runAutoItCode } from 'node-autoit-bridge';
 
-const result = runAutoItCode(`
+const result = await runAutoItCode(`
     Local $sum = 1 + 2 + 3
     ConsoleWrite($sum)
 `);
@@ -132,14 +127,14 @@ const result = runAutoItCode(`
 |-----------|------|-------------|
 | `au3Code` | `string` | Raw AutoIt3 code to execute |
 
-**Returns:** `{ output, time }` — the console output and execution time.
+**Returns:** `Promise<{ output, time }>` — the console output and execution time.
 
 ## How It Works
 
-1. Your function call and parameters are written into a **temporary `.au3` file**
+1. Your AutoIt code or function call are written into a **temporary `.au3` file**
 2. Parameters are JSON-encoded and decoded via Sylvan86's `_JSON_Parse()` function for safe handling of strings, arrays, and objects
 3. `AutoIt3.exe` executes the temp script
-4. The return value is captured, converted to JSON, and returned to your JavaScript
+4. The return value is captured, converted back to JSON, printed to the console, and returned to your JavaScript
 
 No COM objects, no persistent processes — just clean, stateless calls.
 
@@ -150,11 +145,11 @@ No COM objects, no persistent processes — just clean, stateless calls.
 ```js
 // AutoIt function: Func ProcessItems($items) ... EndFunc
 const items = ['apple', 'banana', 'cherry'];
-runAutoItFunction('inventory.au3', 'ProcessItems', items);
+await runAutoItFunction('inventory.au3', 'ProcessItems', items);
 
 // Objects work too
 const config = { timeout: 5000, retries: 3 };
-runAutoItFunction('config.au3', 'ApplyConfig', config);
+await runAutoItFunction('config.au3', 'ApplyConfig', config);
 ```
 
 ### Reading console output
@@ -162,7 +157,7 @@ runAutoItFunction('config.au3', 'ApplyConfig', config);
 If your AutoIt script uses `ConsoleWrite()`, that output is available in the `output` property:
 
 ```js
-const { result, output } = runAutoItFunctionDetailed('debug.au3', 'DoWork');
+const { result, output } = await runAutoItFunctionDetailed('debug.au3', 'DoWork');
 console.log('AutoIt said:', output);
 console.log('Result was:', result);
 ```
@@ -171,7 +166,7 @@ console.log('Result was:', result);
 
 ```js
 try {
-    const result = runAutoItFunction('scripts.au3', 'RiskyOperation');
+    const result = await runAutoItFunction('scripts.au3', 'RiskyOperation');
 } catch (err) {
     console.error('AutoIt call failed:', err.message);
 }

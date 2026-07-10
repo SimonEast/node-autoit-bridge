@@ -2,7 +2,7 @@ import { describe, it, test, expect } from 'vitest'
 import { runAutoItCode, runAutoItFunction, runAutoItFunctionDetailed } from '../bridge.js'
 
 describe('runAutoItCode()', () => {
-	
+
 	test.each([
 		// Basic ConsoleWrite() calls to check that the bridge is working and capturing output correctly
 		['', '"Hello World"', 'Hello World'],
@@ -11,17 +11,18 @@ describe('runAutoItCode()', () => {
 		[`Func Sum($a, $b)
 			Return $a + $b
 		EndFunc`, 'Sum(1.1,2.2)', '3.3'],
-	])('runAutoItCode(%j + %j) == %j', (pre, code, expected) => {
+	])('runAutoItCode(%j + %j) == %j', async (pre, code, expected) => {
 		const au3Code = `
 			${pre}
 			ConsoleWrite(${code})
 		`;
-		expect(runAutoItCode(au3Code)).toMatchObject({ output: expected });
+		const result = await runAutoItCode(au3Code);
+		expect(result).toMatchObject({ output: expected });
 	});
 
-	test('errors should throw an exception', () => {
-		expect(() => runAutoItCode(`NonExistentFunction()`)).toThrow();
-		expect(() => runAutoItCode(`1+x`)).toThrow();
+	test('errors should throw an exception', async () => {
+		await expect(runAutoItCode(`NonExistentFunction()`)).rejects.toThrow();
+		await expect(runAutoItCode(`1+x`)).rejects.toThrow();
 	});
 
 });
@@ -39,13 +40,13 @@ describe('runAutoItFunction()', () => {
 		['tests/sample1.au3', 'ArrayAppend', [['1', '2', '3'], '4'], ['1', '2', '3', '4']],
 		['tests/sample1.au3', 'ArrayAppend', [[{a:1}, {a:2}], {a:3}], [{a:1}, {a:2}, {a:3}]],
 		['tests/sample1.au3', 'ModifyMap', [{ key: 'value', array: [1,2] }], { key: 'value', array: [1,2], newKey: 'newValue' }],
-	])('runAutoItFunction(%j, %j, %j) == %j', (file, func, params, expected) => {
-		const result = runAutoItFunction(file, func, ...params);
+	])('runAutoItFunction(%j, %j, %j) == %j', async (file, func, params, expected) => {
+		const result = await runAutoItFunction(file, func, ...params);
 		expect(result).toEqual(expected);
 	});
 
-	test('errors should throw an exception', () => {
-		expect(() => runAutoItFunction('NonExistentFile.au3', 'NonExistentFunction')).toThrow();
-		expect(() => runAutoItFunction('tests/sample1.au3', 'NonExistentFunction')).toThrow();
+	test('errors should throw an exception', async () => {
+		await expect(runAutoItFunction('NonExistentFile.au3', 'NonExistentFunction')).rejects.toThrow();
+		await expect(runAutoItFunction('tests/sample1.au3', 'NonExistentFunction')).rejects.toThrow();
 	});
 });
