@@ -19,7 +19,7 @@ console.log(result); // "Untitled - Notepad"
 
 - **Windows only** — AutoIt3 is Windows-native
 - **AutoIt3** installed at `C:\Program Files (x86)\AutoIt3\AutoIt3.exe` (the default location)
-- **Node.js** 18+
+- **Node.js** 20.11+ (uses `import.meta.dirname`, added in Node 20.11 / 21.2)
 
 ## Installation
 
