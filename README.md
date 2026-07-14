@@ -58,6 +58,8 @@ console.log(greeting); // "Hello, World!"
 
 That's it! 🎉
 
+You can pass strings, numbers, booleans, arrays, and objects/maps as parameters, and the return value can be any of those types as well.
+
 ## API
 
 ### `runAutoItFunction(file, functionName, ...params)`
@@ -130,7 +132,7 @@ const result = await runAutoItCode(`
 3. `AutoIt3.exe` executes the temp script
 4. The return value is captured, converted back to JSON, printed to the console, and returned to your JavaScript
 
-No COM objects (which are synchronous and cause blocking), no persistent processes — just clean, stateless calls.
+No COM objects (which are synchronous and blocking), no persistent processes — just clean, stateless calls.
 
 ## Examples
 
