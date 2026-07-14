@@ -1,10 +1,14 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFile, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
+const execFileAsync = promisify(execFile);
 
-const execAsync = promisify(exec);
+export const config = {
+    autoItPath: `c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe`,
+    timeout: 4000, // milliseconds
+};
 
 /**
  * Runs raw AutoIt3 code by writing it to a temporary .au3 file and executing it.
@@ -36,9 +40,15 @@ export async function runAutoItCode(au3Code) {
     // (milliseconds are included to reduce the chance of collisions)
     const tempFilePath = join(tmpdir(), `tempScript_${Date.now()}.au3`);
 
-    const tempFileContent = `
+    // We'll #include the JSON lib, if it's used
+    // This is always relative to this bridge.js file, not the target .au3 file
+    const pathToJsonLib = join(import.meta.dirname, 'au3-utilities', 'json.au3');
+    
+    // Create the content of the temporary .au3 file
+    let tempFileContent = `
       #NoTrayIcon
       Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
+      ${au3Code.includes('_JSON_') ? `#include "${pathToJsonLib}"` : ''}
       ${au3Code}
    `;
 
@@ -48,9 +58,11 @@ export async function runAutoItCode(au3Code) {
     const startTime = performance.now();
 
     try {
-        const { stdout } = await execAsync(
-            `"c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe" /ErrorStdOut "${tempFilePath}"`,
-            { encoding: 'utf-8', timeout: 4000 }
+        // Run AutoIt3.exe with the temporary .au3 file and capture the output
+        // Paths do not need to be quoted because execFile handles that automatically
+        const { stdout } = await execFileAsync(
+            config.autoItPath, [`/ErrorStdOut`, tempFilePath],
+            { encoding: 'utf-8', timeout: config.timeout }
         );
         const time = Math.round(performance.now() - startTime) / 1000;
         return { output: stdout, time };
@@ -109,13 +121,10 @@ export async function runAutoItFunction(file, functionName, ...params) {
 export async function runAutoItFunctionDetailed(file, functionName, ...params) {
 
     // Create the content of the temporary .au3 file
-    // Always relative to this bridge.js file, not the target .au3 file
-    const pathToJsonLib = join(import.meta.dirname, 'au3-utilities', 'json.au3');
-
     // Relative to the current working directory
     const pathToTargetFile = join(process.cwd(), file);
 
-    // Generate the list of parameters for the function call, wrapping them in
+    // Generate the list of parameters for the function call, wrapping each one in
     // _JSON_Parse to support arrays, objects, line returns, and special characters
     const functionParams = params.map(p =>
         '_JSON_Parse("' + JSON.stringify(p).replaceAll('"', '""') + '")'
@@ -125,8 +134,8 @@ export async function runAutoItFunctionDetailed(file, functionName, ...params) {
     const functionCall = `${functionName}(${functionParams})`;
 
     // Generate the AutoIt code to be executed
+    // JSON lib will be #included in runAutoItCode()
     const au3Code = `
-      #include "${pathToJsonLib}"
       #include "${pathToTargetFile}"
       Local $result = ${functionCall}
       ConsoleWrite("FUNCTION_OUTPUT_START" & _JSON_Generate($result) & "FUNCTION_OUTPUT_END")

@@ -58,12 +58,6 @@ console.log(greeting); // "Hello, World!"
 
 That's it! 🎉
 
-## Limitations
-
-- **Windows only** — although AutoIt3 can be run in Wine on Mac/Linux in some cases, it is not officially supported
-- **4-second timeout** — each call times out after 4 seconds to prevent hanging. A configurable timeout is planned for a coming release.
-- **No COM interaction** — this bridge uses process execution, not COM objects
-
 ## API
 
 ### `runAutoItFunction(file, functionName, ...params)`
@@ -136,7 +130,7 @@ const result = await runAutoItCode(`
 3. `AutoIt3.exe` executes the temp script
 4. The return value is captured, converted back to JSON, printed to the console, and returned to your JavaScript
 
-No COM objects, no persistent processes — just clean, stateless calls.
+No COM objects (which are synchronous and cause blocking), no persistent processes — just clean, stateless calls.
 
 ## Examples
 
