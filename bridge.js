@@ -8,6 +8,7 @@ const execFileAsync = promisify(execFile);
 export const config = {
     autoItPath: `c:\\Program Files (x86)\\AutoIt3\\AutoIt3.exe`,
     timeout: 4000, // milliseconds
+    debug: false,
 };
 
 /**
@@ -153,11 +154,17 @@ export async function runAutoItFunctionDetailed(file, functionName, ...params) {
         throw new Error('Function output not found in console output');
 
     const functionOutput = JSON.parse(match[1]);
-    return {
+    let result = {
         output: output.split('FUNCTION_OUTPUT_START')[0], // everything before the function output
         result: functionOutput,
         time
     };
+
+    if (config.debug) {
+        result.au3Code = au3Code;
+        result.fullOutput = output;
+    }
+    return result;
 }
 
 // Perform a test run
