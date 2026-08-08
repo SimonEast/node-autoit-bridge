@@ -41,15 +41,17 @@ export async function runAutoItCode(au3Code) {
     // (milliseconds are included to reduce the chance of collisions)
     const tempFilePath = join(tmpdir(), `tempScript_${Date.now()}.au3`);
 
-    // We'll #include the JSON lib, if it's used
-    // This is always relative to this bridge.js file, not the target .au3 file
+    // We'll #include helper libs when used
+    // Paths are always relative to this bridge.js file, not the target .au3 file
     const pathToJsonLib = join(import.meta.dirname, 'au3-utilities', 'json.au3');
+    const pathToConsoleWriteUnicode = join(import.meta.dirname, 'au3-utilities', 'ConsoleWriteUnicode.au3');
     
     // Create the content of the temporary .au3 file
     let tempFileContent = `
       #NoTrayIcon
       Opt("TrayIconHide", 1) ; Hide the AutoIt tray icon for cleaner execution
       ${au3Code.includes('_JSON_') ? `#include "${pathToJsonLib}"` : ''}
+      ${au3Code.includes('_ConsoleWriteUnicode') ? `#include "${pathToConsoleWriteUnicode}"` : ''}
       ${au3Code}
    `;
 
@@ -128,18 +130,20 @@ export async function runAutoItFunctionDetailed(file, functionName, ...params) {
     // Generate the list of parameters for the function call, wrapping each one in
     // _JSON_Parse to support arrays, objects, line returns, and special characters
     const functionParams = params.map(p =>
-        '_JSON_Parse("' + JSON.stringify(p).replaceAll('"', '""') + '")'
+        // `undefined` gets converted to `null`
+        '_JSON_Parse("' + JSON.stringify(p ?? null).replaceAll('"', '""') + '")'
     ).join(', ');
 
     // Full function call string, e.g. MyFunction(_JSON_Parse("param1"), _JSON_Parse("param2"))
     const functionCall = `${functionName}(${functionParams})`;
 
     // Generate the AutoIt code to be executed
-    // JSON lib will be #included in runAutoItCode()
+    // JSON + ConsoleWriteUnicode libs will be #included in runAutoItCode()
+    // _ConsoleWriteUnicode writes UTF-8 so special characters survive the console pipe
     const au3Code = `
       #include "${pathToTargetFile}"
       Local $result = ${functionCall}
-      ConsoleWrite("FUNCTION_OUTPUT_START" & _JSON_Generate($result) & "FUNCTION_OUTPUT_END")
+      _ConsoleWriteUnicode("FUNCTION_OUTPUT_START" & _JSON_Generate($result) & "FUNCTION_OUTPUT_END", False)
    `;
 
     // For debugging, you can log the temp file content
