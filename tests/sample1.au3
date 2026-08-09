@@ -19,6 +19,13 @@ Func WrapString($string)
 	Return "[[" & $string & "]]"
 EndFunc
 
+Func CheckLineReturns($string)
+	$string = StringReplace($string, @CRLF, "[[CRLF]]")
+	$string = StringReplace($string, @CR, "[[CR]]")
+	$string = StringReplace($string, @LF, "[[LF]]")
+	Return $string
+EndFunc
+
 Func AddNumbers($num1, $num2)
 	Return $num1 + $num2
 EndFunc
