@@ -6,14 +6,29 @@
   "author": "Simon East",
   "type": "module",
   "main": "bridge.js",
+  "files": [
+    "README.md",
+    "bridge.js",
+    "au3-utilities/**/*"
+  ],
   "directories": {
     "test": "tests"
   },
-  "scripts": {
-    "test": "vitest --ui"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SimonEast/node-autoit-bridge"
   },
-  "dependencies": {
+  "bugs": {
+    "url": "https://github.com/SimonEast/node-autoit-bridge/issues"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test-ui": "vitest --ui",
+    "pack-dry-run": "npm pack --dry-run"
+  },
+  "devDependencies": {
     "@vitest/ui": "^4.1.10",
     "vitest": "^4.1.10"
-  }
+  },
+  "keywords": ["autoit", "autoit3", "au3", "nodejs", "bridge", "automation", "scripting", "windows", "javascript", "MsgBox", "macros", "automation testing", "UI automation", "desktop automation"]
 }

@@ -8,9 +8,16 @@ describe('runAutoItCode()', () => {
 		['', '"Hello World"', 'Hello World'],
 		['', '"Hello" & " World"', 'Hello World'],
 		['', '1+2+3', '6'],
+
+		// Check that special characters are handled correctly
+		// This currently fails because AutoIt's ConsoleWrite() does not handle UTF-8 characters well, so we need to use _ConsoleWriteUnicode() instead
+		// ['', '"“special chars” 🙂"', '“special chars” 🙂'],
+
+		// Check that functions can be defined and called correctly
 		[`Func Sum($a, $b)
 			Return $a + $b
 		EndFunc`, 'Sum(1.1,2.2)', '3.3'],
+
 	])('runAutoItCode(%j + %j) == %j', async (pre, code, expected) => {
 		const au3Code = `
 			${pre}
@@ -19,6 +26,8 @@ describe('runAutoItCode()', () => {
 		const result = await runAutoItCode(au3Code);
 		expect(result).toMatchObject({ output: expected });
 	});
+
+	test.todo('On timeout, the AutoIt process should be terminated and an error should be thrown');
 
 	test('errors should throw an exception', async () => {
 		await expect(runAutoItCode(`NonExistentFunction()`)).rejects.toThrow();
@@ -29,21 +38,39 @@ describe('runAutoItCode()', () => {
 
 describe('runAutoItFunction()', () => {
 	test.each([
+		
 		// Inputs and expected outputs
 		['tests/sample1.au3', 'WrapString', ['this is a test'], '[[this is a test]]'],
 		['tests/sample1.au3', 'WrapString', ['test 2'], '[[test 2]]'],
+
+		// Check that special characters are handled correctly
+		['tests/sample1.au3', 'WrapString', ['"'], '[["]]'],
+		['tests/sample1.au3', 'WrapString', ['""'], '[[""]]'],
+		['tests/sample1.au3', 'WrapString', ['"test"'], '[["test"]]'],
+		['tests/sample1.au3', 'WrapString', ['\''], '[[\']]'],
+		['tests/sample1.au3', 'WrapString', ['\''], '[[\']]'],
+		['tests/sample1.au3', 'WrapString', ['\'test\''], '[[\'test\']]'],
 		['tests/sample1.au3', 'WrapString', ['test with special chars: !@#$%^&*()`“”‘’→°'], '[[test with special chars: !@#$%^&*()`“”‘’→°]]'],
-		['tests/sample1.au3', 'WrapString', ['a\r\nb'], '[[a\r\nb]]'],
+
+		// Check that line endings are handled correctly
+		['tests/sample1.au3', 'WrapString', ['"a""\r\n""b"'], '[["a""\r\n""b"]]'],
 		['tests/sample1.au3', 'WrapString', ['a\nb'], '[[a\nb]]'],
 		['tests/sample1.au3', 'CheckLineReturns', ['a\r\nb'], 'a[[CRLF]]b'],
 		['tests/sample1.au3', 'CheckLineReturns', ['a\nb'], 'a[[LF]]b'],
 		['tests/sample1.au3', 'CheckLineReturns', ['a\rb'], 'a[[CR]]b'],
+
+		// Numbers
 		['tests/sample1.au3', 'AddNumbers', [1.1, 2.2], 3.3],
+
+		// Arrays
 		['tests/sample1.au3', 'ArrayAppend', [[1, 2, 3], 4], [1, 2, 3, 4]],
 		['tests/sample1.au3', 'ArrayAppend', [[1, [2,2], 3], 4], [1, [2, 2], 3, 4]],
 		['tests/sample1.au3', 'ArrayAppend', [['1', '2', '3'], '4'], ['1', '2', '3', '4']],
 		['tests/sample1.au3', 'ArrayAppend', [[{a:1}, {a:2}], {a:3}], [{a:1}, {a:2}, {a:3}]],
+
+		// Objects
 		['tests/sample1.au3', 'ModifyMap', [{ key: 'value', array: [1,2] }], { key: 'value', array: [1,2], newKey: 'newValue' }],
+
 	])('runAutoItFunction(%j, %j, %j) == %j', async (file, func, params, expected) => {
 		const result = await runAutoItFunction(file, func, ...params);
 		expect(result).toEqual(expected);
